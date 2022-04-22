@@ -5,6 +5,7 @@ import {
   method,
   UInt64,
   PrivateKey,
+  Signature,
   SmartContract,
   Mina,
   Party,
@@ -26,6 +27,9 @@ async function main() {
   Mina.setActiveInstance(Local);
 
   let initiating_account = Local.testAccounts[0].privateKey;
+  let replicator_sk = Local.testAccounts[1].privateKey;
+  let replicator_pk = Local.testAccounts[1].publicKey;
+  let replicatorPublicKey = replicator_pk;
 
   let zkappKey = PrivateKey.random();
   let zkappAddress = zkappKey.toPublicKey();
@@ -37,9 +41,9 @@ async function main() {
 
   console.log('deploy');
   let zkapp = new SimpleZkapp(zkappAddress);
-  deploy(Local, initiating_account, zkapp, { zkappKey, initialBalance, initialState });
+  deploy(Local, initiating_account, zkapp, { zkappKey, initialBalance, initialState, replicatorPublicKey });
 
-  let zkappState = (await Mina.getAccount(zkappAddress)).zkapp.appState[0];
+  let zkappState = (await Mina.getAccount(zkappAddress)).zkapp.appState;
   console.log('initial state: ' + zkappState);
 
   // -----------------------------------------
@@ -47,15 +51,17 @@ async function main() {
   console.log('update');
   Local.transaction(initiating_account, async () => {
     let zkapp = new SimpleZkapp(zkappAddress);
-    let f = Poseidon.hash([ Field(2) ])
-    zkapp.update(f);
+    let update_hash = Poseidon.hash([ Field(2) ])
+    let update_height = Field(1);
+    let update_signature = Signature.create(replicator_sk, [ update_hash, update_height ]);
+    zkapp.update(update_hash, update_height, update_signature);
     zkapp.self.sign(zkappKey);
     zkapp.self.body.incrementNonce = Bool(true);
   }).send();
 
   // -----------------------------------------
 
-  zkappState = (await Mina.getAccount(zkappAddress)).zkapp.appState[0];
+  zkappState = (await Mina.getAccount(zkappAddress)).zkapp.appState;
   console.log('final state: ' + zkappState);
 
   shutdown();
