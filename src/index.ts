@@ -17,6 +17,7 @@ import {
 } from 'snarkyjs';
 
 import { SimpleZkapp } from './demo_app.js'
+import { Replicator } from './replicator.js'
 
 await isReady;
 
@@ -26,13 +27,17 @@ async function main() {
   let Local = Mina.LocalBlockchain();
   Mina.setActiveInstance(Local);
 
+  let bufferSize = 8;
+
+  let replicator = new Replicator(bufferSize);
+  let replicator_pk = replicator.pk;
+
   let initiating_account = Local.testAccounts[0].privateKey;
-  let replicator_sk = Local.testAccounts[1].privateKey;
-  let replicator_pk = Local.testAccounts[1].publicKey;
-  let replicatorPublicKey = replicator_pk;
 
   let zkappKey = PrivateKey.random();
   let zkappAddress = zkappKey.toPublicKey();
+
+  replicator.register_account(zkappAddress);
 
   let initialBalance = UInt64.fromNumber(10_000_000_000);
   let initialState = Field(1);
@@ -41,7 +46,7 @@ async function main() {
 
   console.log('deploy');
   let zkapp = new SimpleZkapp(zkappAddress);
-  deploy(Local, initiating_account, zkapp, { zkappKey, initialBalance, initialState, replicatorPublicKey });
+  deploy(Local, initiating_account, zkapp, { zkappKey, initialBalance, initialState, replicatorPublicKey: replicator_pk, bufferSize: UInt64.fromNumber(bufferSize) });
 
   let zkappState = (await Mina.getAccount(zkappAddress)).zkapp.appState;
   console.log('initial state: ' + zkappState);
@@ -49,20 +54,28 @@ async function main() {
   // -----------------------------------------
 
   console.log('update');
-  Local.transaction(initiating_account, async () => {
-    let zkapp = new SimpleZkapp(zkappAddress);
-    let update_hash = Poseidon.hash([ Field(2) ])
-    let update_height = Field(1);
-    let update_signature = Signature.create(replicator_sk, [ update_hash, update_height ]);
-    zkapp.update(update_hash, update_height, update_signature);
-    zkapp.self.sign(zkappKey);
-    zkapp.self.body.incrementNonce = Bool(true);
-  }).send();
-
-  // -----------------------------------------
+  let result = replicator.request_store(zkappAddress, [ Field(2) ]);
+  if (result != null) {
+    let { hash, height, signature } = result;
+    Local.transaction(initiating_account, async () => {
+      let zkapp = new SimpleZkapp(zkappAddress);
+      zkapp.update(hash, height, signature);
+      zkapp.self.sign(zkappKey);
+      zkapp.self.body.incrementNonce = Bool(true);
+    }).send();
+  }
 
   zkappState = (await Mina.getAccount(zkappAddress)).zkapp.appState;
-  console.log('final state: ' + zkappState);
+  console.log('state after store: ' + zkappState);
+
+  let stored_data = replicator.get_stored(zkappAddress, zkappState[0])
+  if (stored_data != null) {
+    console.log(stored_data.map((f) => f.toString()));
+  }
+
+  await replicator.cleanup_all();
+
+  // -----------------------------------------
 
   shutdown();
 }
