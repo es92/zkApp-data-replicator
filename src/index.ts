@@ -11,8 +11,11 @@ import {
   isReady,
   Bool,
   Permissions,
+  Poseidon,
   shutdown,
 } from 'snarkyjs';
+
+import { SimpleZkapp } from './demo_app.js'
 
 await isReady;
 
@@ -22,7 +25,7 @@ async function main() {
   let Local = Mina.LocalBlockchain();
   Mina.setActiveInstance(Local);
 
-  let account1 = Local.testAccounts[0].privateKey;
+  let initiating_account = Local.testAccounts[0].privateKey;
 
   let zkappKey = PrivateKey.random();
   let zkappAddress = zkappKey.toPublicKey();
@@ -30,25 +33,27 @@ async function main() {
   let initialBalance = UInt64.fromNumber(10_000_000_000);
   let initialState = Field(1);
 
+  // -----------------------------------------
+
   console.log('deploy');
-  Local.transaction(account1, () => {
-    const p = Party.createSigned(account1, { isSameAsFeePayer: true });
-    p.balance.subInPlace(initialBalance);
-    let zkapp = new SimpleZkapp(zkappAddress);
-    zkapp.deploy({ zkappKey, initialBalance, initialState });
-  }).send();
+  let zkapp = new SimpleZkapp(zkappAddress);
+  deploy(Local, initiating_account, zkapp, { zkappKey, initialBalance, initialState });
 
   let zkappState = (await Mina.getAccount(zkappAddress)).zkapp.appState[0];
   console.log('initial state: ' + zkappState);
 
+  // -----------------------------------------
+
   console.log('update');
-  Local.transaction(account1, async () => {
+  Local.transaction(initiating_account, async () => {
     let zkapp = new SimpleZkapp(zkappAddress);
-    zkapp.update(Field(3));
-    // TODO: mock proving
+    let f = Poseidon.hash([ Field(2) ])
+    zkapp.update(f);
     zkapp.self.sign(zkappKey);
     zkapp.self.body.incrementNonce = Bool(true);
   }).send();
+
+  // -----------------------------------------
 
   zkappState = (await Mina.getAccount(zkappAddress)).zkapp.appState[0];
   console.log('final state: ' + zkappState);
@@ -56,27 +61,16 @@ async function main() {
   shutdown();
 }
 
-class SimpleZkapp extends SmartContract {
-  @state(Field) x = State<Field>();
+// =======================================================
 
-  deploy(args: {
-    zkappKey: PrivateKey;
-    initialBalance: UInt64;
-    initialState: Field;
-  }) {
-    super.deploy(args);
-    this.self.update.permissions.setValue({
-      ...Permissions.default(),
-      editState: Permissions.proofOrSignature(),
-    });
-    this.balance.addInPlace(args.initialBalance);
-    this.x.set(args.initialState);
-  }
-
-  @method update(y: Field) {
-    let x = this.x.get();
-    this.x.set(x.add(y));
-  }
+function deploy(Local: any, initiating_account: PrivateKey, zkapp: SimpleZkapp, args: any) {
+  Local.transaction(initiating_account, () => {
+    const p = Party.createSigned(initiating_account, { isSameAsFeePayer: true });
+    p.balance.subInPlace(args.initialBalance);
+    zkapp.deploy(args)
+  }).send();
 }
+
+// =======================================================
 
 main();
