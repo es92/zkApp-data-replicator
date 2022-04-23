@@ -5,6 +5,7 @@ import {
   method,
   UInt64,
   PrivateKey,
+  PublicKey,
   Signature,
   SmartContract,
   Mina,
@@ -30,6 +31,7 @@ await isReady;
 async function main() {
 
   var wmina: any = new Requester('ws://localhost:3000');
+  var replicator: any = new Requester('ws://localhost:3001');
   //var rrr = await r.call('test_fn', { 'hi': 7 })
   //console.log('got response!', rrr);
 
@@ -37,15 +39,16 @@ async function main() {
 
   let bufferSize = 8;
 
-  let replicator = new Replicator(bufferSize);
-  let replicator_pk = replicator.pk;
+  //let replicator = new Replicator(bufferSize);
+  //let replicator_pk = replicator.pk;
+  let replicator_pk = <any>PublicKey.fromJSON(await replicator.call('get_pk'));
 
   let initiating_account: any = PrivateKey.fromJSON((await wmina.call('get_test_account', 0)));
 
   let zkappKey = PrivateKey.random();
   let zkappAddress = zkappKey.toPublicKey();
 
-  replicator.register_account(zkappAddress);
+  await replicator.call('register_account', zkappAddress.toJSON());
 
   let initialBalance = UInt64.fromNumber(10_000_000_000);
   let initialState = Field(1);
@@ -70,12 +73,17 @@ async function main() {
 
   console.log('update');
 
-  var fields = replicator.to_fields({ "test": [ 7, 4 ] })
-  var data = replicator.from_fields(fields);
-  let result = replicator.request_store(zkappAddress, fields);
+  var fields = (await replicator.call('to_fields', { "test": [ 7, 4 ] })).map((f: any) => <any>Field.fromJSON(f));
+  var data = await replicator.call('from_fields', fields.map((f: any) => f.toJSON()));
+  let result = await replicator.call('request_store', 
+                              { zkappAddress: zkappAddress.toJSON(), 
+                                fields: fields.map((f: any) => f.toJSON()) });
 
   if (result != null) {
     let { hash, height, signature } = result;
+    hash = Field.fromJSON(hash);
+    height = Field.fromJSON(height);
+    signature = Signature.fromJSON(signature);
     wmina.call('transaction', { 
       hash: hash.toJSON(),
       height: height.toJSON(),
@@ -89,13 +97,13 @@ async function main() {
   zkappState = (await wmina.call('getAppState', zkappAddress.toJSON())).map((f: any) => Field.fromJSON(f));
   console.log('state after store: ' + zkappState);
 
-  let stored_data = replicator.get_stored(zkappAddress, zkappState[0])
+  let stored_data = (await replicator.call('get_stored', { zkappAddress: zkappAddress.toJSON(), zkappState: zkappState[0].toJSON() })).map((f: any) => <any>Field.fromJSON(f));
   if (stored_data != null) {
-    var data = replicator.from_fields(stored_data);
+    var data = (await replicator.call('from_fields', stored_data.map((f: any) => f.toJSON())));
     console.log('got', data);
   }
 
-  await replicator.cleanup_all(wmina);
+  await replicator.call('cleanup_all');
 
   // -----------------------------------------
 

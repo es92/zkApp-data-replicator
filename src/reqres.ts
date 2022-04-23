@@ -8,7 +8,7 @@ export { Handler, Requester }
 class Handler {
   event_table: any;
 
-  constructor() {
+  constructor(port: number = 3000) {
     const server = http.createServer();
     const io = new socketio.Server(server);
 
@@ -42,7 +42,7 @@ class Handler {
       });
     });
 
-    server.listen(3000);
+    server.listen(port);
   }
 
   on(name: string, fn: any) {
