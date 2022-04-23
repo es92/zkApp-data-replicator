@@ -16,23 +16,29 @@ import {
   shutdown,
 } from 'snarkyjs';
 
+import { io } from "socket.io-client";
+
 import { SimpleZkapp } from './demo_app.js'
 import { Replicator } from './replicator.js'
+import { Wrapped_Mina } from './wrapped_mina.js'
 
 await isReady;
 
 // =======================================================
 
 async function main() {
-  let Local = Mina.LocalBlockchain();
-  Mina.setActiveInstance(Local);
+
+  var socket = io('ws://localhost:3000')
+  socket.emit('event', 'data');
+
+  var wmina = new Wrapped_Mina()
 
   let bufferSize = 8;
 
   let replicator = new Replicator(bufferSize);
   let replicator_pk = replicator.pk;
 
-  let initiating_account = Local.testAccounts[0].privateKey;
+  let initiating_account = wmina.Local.testAccounts[0].privateKey;
 
   let zkappKey = PrivateKey.random();
   let zkappAddress = zkappKey.toPublicKey();
@@ -46,7 +52,7 @@ async function main() {
 
   console.log('deploy');
   let zkapp = new SimpleZkapp(zkappAddress);
-  deploy(Local, initiating_account, zkapp, 
+  deploy(wmina.Local, initiating_account, zkapp, 
         { zkappKey, 
           initialBalance, 
           initialState,
@@ -59,13 +65,14 @@ async function main() {
   // -----------------------------------------
 
   console.log('update');
-  let result = replicator.request_store(zkappAddress, [ Field(2), Field(7) ]);
+
   var fields = replicator.to_fields({ "test": [ 7, 4 ] })
   var data = replicator.from_fields(fields);
-  console.log(data);
+  let result = replicator.request_store(zkappAddress, fields);
+
   if (result != null) {
     let { hash, height, signature } = result;
-    Local.transaction(initiating_account, async () => {
+    wmina.Local.transaction(initiating_account, async () => {
       let zkapp = new SimpleZkapp(zkappAddress);
       zkapp.update(hash, height, signature);
       zkapp.self.sign(zkappKey);
@@ -78,7 +85,8 @@ async function main() {
 
   let stored_data = replicator.get_stored(zkappAddress, zkappState[0])
   if (stored_data != null) {
-    console.log(stored_data.map((f) => f.toString()));
+    var data = replicator.from_fields(stored_data);
+    console.log('got', data);
   }
 
   await replicator.cleanup_all();
