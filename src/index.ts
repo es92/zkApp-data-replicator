@@ -62,15 +62,8 @@ async function main() {
       replicatorPublicKey: replicator_pk.toJSON(), 
       bufferSize: UInt64.fromNumber(bufferSize).toJSON() }
   });
-  console.log('B');
-  //deploy(wmina.Local, initiating_account, zkapp, 
-  //      { zkappKey, 
-  //        initialBalance, 
-  //        initialState,
-  //        replicatorPublicKey: replicator_pk, 
-  //        bufferSize: UInt64.fromNumber(bufferSize) });
-
-  let zkappState = (await Mina.getAccount(zkappAddress)).zkapp.appState;
+  //let zkappState = (await Mina.getAccount(zkappAddress)).zkapp.appState;
+  let zkappState = (await wmina.call('getAppState', zkappAddress.toJSON())).map((f: any) => Field.fromJSON(f));
   console.log('initial state: ' + zkappState);
 
   // -----------------------------------------
@@ -83,15 +76,17 @@ async function main() {
 
   if (result != null) {
     let { hash, height, signature } = result;
-    wmina.Local.transaction(initiating_account, async () => {
-      let zkapp = new SimpleZkapp(zkappAddress);
-      zkapp.update(hash, height, signature);
-      zkapp.self.sign(zkappKey);
-      zkapp.self.body.incrementNonce = Bool(true);
-    }).send();
+    wmina.call('transaction', { 
+      hash: hash.toJSON(),
+      height: height.toJSON(),
+      signature: signature.toJSON(),
+      initiating_account: initiating_account.toJSON(),
+      zkappAddress: zkappAddress.toJSON(),
+      privateKey: zkappKey.toJSON(),
+    });
   }
 
-  zkappState = (await Mina.getAccount(zkappAddress)).zkapp.appState;
+  zkappState = (await wmina.call('getAppState', zkappAddress.toJSON())).map((f: any) => Field.fromJSON(f));
   console.log('state after store: ' + zkappState);
 
   let stored_data = replicator.get_stored(zkappAddress, zkappState[0])
@@ -100,7 +95,7 @@ async function main() {
     console.log('got', data);
   }
 
-  await replicator.cleanup_all();
+  await replicator.cleanup_all(wmina);
 
   // -----------------------------------------
 

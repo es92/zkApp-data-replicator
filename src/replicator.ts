@@ -82,11 +82,12 @@ class Replicator {
     return JSON.parse(str);
   }
 
-  async cleanup_all() {
+  async cleanup_all(wmina: any) {
     let pk58s = Object.keys(this.stores);
     for (var i = 0; i < pk58s.length; i++) {
       var pk58 = pk58s[i];
-      let zkappState = (await Mina.getAccount(PublicKey.fromBase58(pk58))).zkapp.appState
+      let pk = PublicKey.fromBase58(pk58);
+      let zkappState = (await wmina.call('getAppState', pk)).map((f: any) => Field.fromJSON(f));
       var latestHeight = Number(zkappState[1].toString());
       this.stores[pk58] = this.stores[pk58].filter((x) => x.height >= latestHeight - this.bufferSize);
     }

@@ -40,9 +40,23 @@ function main() {
 
   handler.on('deploy', async (args: any) => {
     let zkappAddress: any = PublicKey.fromJSON(args.zkappAddress);
-    let zkapp = new SimpleZkapp(args.zkappAddress);
+    let zkapp = new SimpleZkapp(zkappAddress);
     let initiating_account: any = PrivateKey.fromJSON(args.initiating_account);
     await deploy(wmina.Local, initiating_account, zkapp, args.args);
+  });
+
+  handler.on('getAppState', async (addr: any) => {
+    var state = (await Mina.getAccount(<any>PublicKey.fromJSON(addr))).zkapp.appState
+    return state.map((f: any) => f.toJSON());
+  });
+
+  handler.on('transaction', async (args: any) => {
+    wmina.Local.transaction(<any>PrivateKey.fromJSON(args.initiating_account), async () => {
+      let zkapp = new SimpleZkapp(<any>PublicKey.fromJSON(args.zkappAddress));
+      zkapp.update(<any>Field.fromJSON(args.hash), <any>Field.fromJSON(args.height), <any>Signature.fromJSON(args.signature));
+      zkapp.self.sign(<any>PrivateKey.fromJSON(args.privateKey));
+      zkapp.self.body.incrementNonce = Bool(true);
+    }).send();
   });
 }
 
@@ -57,7 +71,6 @@ async function deploy(Local: any, initiating_account: PrivateKey, zkapp: any, ar
       replicatorPublicKey: PublicKey.fromJSON(args.replicatorPublicKey),
       bufferSize: <any>UInt64.fromJSON(args.bufferSize)
     };
-    console.log(obj);
     zkapp.deploy(obj);
   }).send();
 }
