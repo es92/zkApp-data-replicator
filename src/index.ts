@@ -30,13 +30,8 @@ await isReady;
 async function main() {
 
   var r = new Requester('ws://localhost:3000');
-  r.call('test_fn', { 'hi': 7 }).then((result: any) => {
-    console.log('got response!', result);
-  });
-
-  if (4/2 == 2) {
-    return;
-  }
+  //var rrr = await r.call('test_fn', { 'hi': 7 })
+  //console.log('got response!', rrr);
 
   var wmina = new Wrapped_Mina()
 
