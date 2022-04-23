@@ -21,6 +21,7 @@ import { io } from "socket.io-client";
 import { SimpleZkapp } from './demo_app.js'
 import { Replicator } from './replicator.js'
 import { Wrapped_Mina } from './wrapped_mina.js'
+import { Requester } from './reqres.js';
 
 await isReady;
 
@@ -28,8 +29,14 @@ await isReady;
 
 async function main() {
 
-  var socket = io('ws://localhost:3000')
-  socket.emit('event', 'data');
+  var r = new Requester('ws://localhost:3000');
+  r.call('test_fn', { 'hi': 7 }).then((result: any) => {
+    console.log('got response!', result);
+  });
+
+  if (4/2 == 2) {
+    return;
+  }
 
   var wmina = new Wrapped_Mina()
 
