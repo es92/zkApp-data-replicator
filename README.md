@@ -2,14 +2,14 @@
 
 ## Things that could be done
 
-* Implement a merkle tree type; merkle root is stored on chain, data stored on replicator.
-  * Why: then the zkApp can enforce rules on changes to the database
-
-* Move the wrapped replicator to the cloud with socket.io
-  * Why: then the replicator is actually useful for multiple nodes to interact with
+* Make a test app; consider if you pay more than the last person, you decide what data is in the account
+  * Why: Make sure this all works from end to end, including wmina / replicator running remotely
 
 * Create a Wrapped_Mina that uses GraphQL
   * Why: Then this code can actually interact with the real blockchain
+
+* Implement a merkle tree type; merkle root is stored on chain, data stored on replicator.
+  * Why: then the zkApp can enforce rules on changes to the database
 
 * Require users to pay the replicator
   * Why: To prevent DDOS and create a payment model for the replicator
