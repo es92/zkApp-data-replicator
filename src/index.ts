@@ -29,18 +29,18 @@ await isReady;
 
 async function main() {
 
-  var r = new Requester('ws://localhost:3000');
+  var wmina: any = new Requester('ws://localhost:3000');
   //var rrr = await r.call('test_fn', { 'hi': 7 })
   //console.log('got response!', rrr);
 
-  var wmina = new Wrapped_Mina()
+  //var wmina = new Wrapped_Mina()
 
   let bufferSize = 8;
 
   let replicator = new Replicator(bufferSize);
   let replicator_pk = replicator.pk;
 
-  let initiating_account = wmina.Local.testAccounts[0].privateKey;
+  let initiating_account: any = PrivateKey.fromJSON((await wmina.call('get_test_account', 0)));
 
   let zkappKey = PrivateKey.random();
   let zkappAddress = zkappKey.toPublicKey();
@@ -53,13 +53,22 @@ async function main() {
   // -----------------------------------------
 
   console.log('deploy');
-  let zkapp = new SimpleZkapp(zkappAddress);
-  deploy(wmina.Local, initiating_account, zkapp, 
-        { zkappKey, 
-          initialBalance, 
-          initialState,
-          replicatorPublicKey: replicator_pk, 
-          bufferSize: UInt64.fromNumber(bufferSize) });
+  await wmina.call('deploy', {
+    initiating_account: initiating_account.toJSON(), 
+    zkappAddress: zkappAddress.toJSON(), 
+    args: { zkappKey: zkappKey.toJSON(), 
+      initialBalance: initialBalance.toJSON(), 
+      initialState: initialState.toJSON(),
+      replicatorPublicKey: replicator_pk.toJSON(), 
+      bufferSize: UInt64.fromNumber(bufferSize).toJSON() }
+  });
+  console.log('B');
+  //deploy(wmina.Local, initiating_account, zkapp, 
+  //      { zkappKey, 
+  //        initialBalance, 
+  //        initialState,
+  //        replicatorPublicKey: replicator_pk, 
+  //        bufferSize: UInt64.fromNumber(bufferSize) });
 
   let zkappState = (await Mina.getAccount(zkappAddress)).zkapp.appState;
   console.log('initial state: ' + zkappState);
