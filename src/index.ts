@@ -46,7 +46,12 @@ async function main() {
 
   console.log('deploy');
   let zkapp = new SimpleZkapp(zkappAddress);
-  deploy(Local, initiating_account, zkapp, { zkappKey, initialBalance, initialState, replicatorPublicKey: replicator_pk, bufferSize: UInt64.fromNumber(bufferSize) });
+  deploy(Local, initiating_account, zkapp, 
+        { zkappKey, 
+          initialBalance, 
+          initialState,
+          replicatorPublicKey: replicator_pk, 
+          bufferSize: UInt64.fromNumber(bufferSize) });
 
   let zkappState = (await Mina.getAccount(zkappAddress)).zkapp.appState;
   console.log('initial state: ' + zkappState);
@@ -54,7 +59,10 @@ async function main() {
   // -----------------------------------------
 
   console.log('update');
-  let result = replicator.request_store(zkappAddress, [ Field(2) ]);
+  let result = replicator.request_store(zkappAddress, [ Field(2), Field(7) ]);
+  var fields = replicator.to_fields({ "test": [ 7, 4 ] })
+  var data = replicator.from_fields(fields);
+  console.log(data);
   if (result != null) {
     let { hash, height, signature } = result;
     Local.transaction(initiating_account, async () => {

@@ -57,6 +57,31 @@ class Replicator {
     return null;
   }
 
+  to_fields(data: any) {
+    var str = JSON.stringify(data);
+    var enc = new TextEncoder();
+    var uint8s = enc.encode(str)
+    var padding_needed = (8 - uint8s.length % 4 ) % 4;
+
+    var padded = new Uint8Array(uint8s.length + padding_needed + 4);
+    padded.fill(0);
+    padded.set(uint8s, 0);
+    padded.set(Uint8Array.from([ 0, 0, 0, padding_needed ]), padded.byteLength-4);
+    var uint32s = new Uint32Array(padded.buffer)
+    var fields = Array.from(uint32s).map((x) => Field(x));
+    return fields
+  }
+
+  from_fields(fields: Field[]) {
+    var uint32s = Uint32Array.from(fields.map((f) => Number(f.toString())));
+    var uint8s = new Uint8Array(uint32s.buffer);
+    var padding_needed = uint8s[uint8s.byteLength-1];
+    var encoded = uint8s.slice(0, uint8s.byteLength - 4 - padding_needed);
+    var dec = new TextDecoder();
+    var str = dec.decode(encoded)
+    return JSON.parse(str);
+  }
+
   async cleanup_all() {
     let pk58s = Object.keys(this.stores);
     for (var i = 0; i < pk58s.length; i++) {
